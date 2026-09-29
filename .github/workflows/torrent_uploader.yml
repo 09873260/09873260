@@ -33,6 +33,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          SEARCH_QUERY: ${{ github.event.inputs.search_query || 'Ubuntu' }}
+          SEARCH_QUERY: ${{ github.event.inputs.search_query || 'Matrix' }}
+          RESULT_INDEX: ${{ github.event.inputs.result_index || '1' }}
         run: |
           python main.py
