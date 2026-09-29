@@ -19,6 +19,12 @@ FEEDS = [
     "https://feeds.simplecast.com/qm_9xx0g",
     "https://feeds.simplecast.com/JZSQrle9",
     "https://feeds.megaphone.fm/WWO7410387571",
+    "https://feeds.megaphone.fm/RSV1597324942",
+    "https://rss2.flightcast.com/xmsftuzjjykcmqwolaqn6mdn",
+    "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/32f1779e-bc01-4d36-89e6-afcb01070c82/e0c8382f-48d4-42bb-89d5-afcb01075cb4/podcast.rss",
+    "https://anchor.fm/s/1007c648c/podcast/rss",
+    "https://anchor.fm/s/102ae1cf0/podcast/rss",
+    "https://tonyrobbins.libsyn.com/rss",
 ]
 
 STATE_FILE = "seen.json"
