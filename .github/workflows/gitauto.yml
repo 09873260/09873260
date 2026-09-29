@@ -1,0 +1,57 @@
+name: GitAuto
+
+on:
+  schedule:
+    - cron: "30 */2 * * *"
+  workflow_dispatch:
+    inputs:
+      test:
+        description: "Test latest episode detection now"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install feedparser requests
+
+      - name: Run script
+        env:
+          TEST_SEND: ${{ github.event.inputs.test }}
+        run: python gitauto.py
+
+      - name: Save state and files
+        run: |
+          git config user.name "bot"
+          git config user.email "bot@users.noreply.github.com"
+          # מניעת שגיאת 100MB: מחיקת קבצים שגדולים מ-95MB מתיקיית הגיט בלבד
+          find podcasts/ -type f -size +95M -exec rm -f {} +
+          git add seen.json podcasts/
+          git diff --cached --quiet || (git commit -m "Add podcast episodes and update state" && git push)
+
+      - name: Zip podcasts folder with date
+        run: |
+          TODAY=$(date +'%Y-%m-%d')
+          zip -r "podcasts-$TODAY.zip" podcasts/
+
+      - name: Upload to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # יוצר את ה-Release אם הוא לא קיים
+          gh release create podcast-episodes-release --title "Daily Podcast Archives" --notes "Daily automated archives of downloaded podcast episodes." || true
+          
+          # מעלה את קובץ ה-ZIP של היום הנוכחי בלי למחוק את הקבצים של הימים הקודמים
+          TODAY=$(date +'%Y-%m-%d')
+          gh release upload podcast-episodes-release "podcasts-$TODAY.zip" --clobber
