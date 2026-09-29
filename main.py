@@ -9,30 +9,37 @@ REPO_NAME = os.getenv("GITHUB_REPOSITORY")
 SEARCH_QUERY = os.getenv("SEARCH_QUERY", "Ubuntu")
 
 
-def search_torrents_multiple_sources(query):
-  """Searches multiple public torrent sources/APIs for the query."""
+def search_archive_org(query):
+  """Searches Internet Archive (Archive.org) for items with torrents."""
   torrents = []
-
-  # Source 1: Example public API (e.g., YTS API)
-  print(f"[*] Searching Source 1 for: {query}")
+  print(f"[*] Searching Internet Archive for: {query}")
   try:
-    url = f"https://yts.mx/api/v2/list_movies.json?query_term={query}"
+    url = f"https://archive.org/advancedsearch.php?q={query}&fl[]=identifier&fl[]=title&rows=3&output=json"
     response = requests.get(url, timeout=10)
     if response.status_code == 200:
       data = response.json()
-      movies = data.get("data", {}).get("movies", [])
-      for movie in movies:
-        for torrent in movie.get("torrents", []):
-          torrents.append({
-              "name": f"{movie['title']} ({movie['year']}) - {torrent['quality']}",
-              "url": torrent["url"],
-          })
+      docs = data.get("response", {}).get("docs", [])
+      for doc in docs:
+        identifier = doc.get("identifier")
+        title = doc.get("title", identifier)
+        # Archive.org automatically provides a .torrent file for every item
+        torrent_url = f"https://archive.org/download/{identifier}/{identifier}_archive.torrent"
+        torrents.append({"name": f"Archive - {title}", "url": torrent_url})
   except Exception as e:
-    print(f"[!] Error searching Source 1: {e}")
-
-  # You can add more sources here (e.g., Archive.org, other APIs)
-
+    print(f"[!] Error searching Internet Archive: {e}")
   return torrents
+
+
+def search_torrents_multiple_sources(query):
+  """Combines search results from multiple public sources."""
+  all_torrents = []
+
+  # מקור 1: Internet Archive
+  all_torrents.extend(search_archive_org(query))
+
+  # אפשר להוסיף כאן מקורות נוספים בקלות בעתיד
+
+  return all_torrents
 
 
 def process_and_upload(torrent_info):
@@ -44,14 +51,19 @@ def process_and_upload(torrent_info):
   safe_name = "".join(
       c for c in name if c.isalnum() or c in (" ", "-", "_")
   ).strip()
+  if not safe_name:
+    safe_name = "torrent_file"
+
+  # הגבלת אורך השם למניעת שגיאות אורך ב-GitHub
+  safe_name = safe_name[:40]
   torrent_filename = f"{safe_name}.torrent"
   zip_filename = f"{safe_name}.zip"
 
-  print(f"\n[*] Downloading torrent: {name}")
+  print(f"\n[*] Downloading torrent from: {url}")
   try:
-    res = requests.get(url, timeout=10)
+    res = requests.get(url, timeout=15)
     if res.status_code != 200:
-      print(f"[!] Failed to download torrent from {url}")
+      print(f"[!] Failed to download torrent (Status code: {res.status_code})")
       return
 
     with open(torrent_filename, "wb") as f:
@@ -67,17 +79,19 @@ def process_and_upload(torrent_info):
     g = Github(GITHUB_TOKEN)
     repo = g.get_repo(REPO_NAME)
 
-    # Create a unique tag name based on the safe name and a random/hash suffix if needed
     tag_name = (
-        f"torrent-{safe_name[:25].lower().replace(' ', '-')}-{os.urandom(2).hex()}"
+        f"torrent-{safe_name.lower().replace(' ', '-')}-{os.urandom(2).hex()}"
     )
-    release_title = f"Torrent: {name}"
+    release_title = f"Torrent: {name[:50]}"
 
     try:
       release = repo.create_git_release(
           tag=tag_name,
           name=release_title,
-          message=f"Automated cloud release containing the torrent file for {name}.",
+          message=(
+              "Automated cloud release containing the torrent file for"
+              f" {name}."
+          ),
           draft=False,
           prerelease=False,
       )
@@ -100,5 +114,5 @@ if __name__ == "__main__":
   else:
     results = search_torrents_multiple_sources(SEARCH_QUERY)
     print(f"[*] Found {len(results)} torrents.")
-    for item in results[:2]:  # Limits to first 2 to prevent rate limits
+    for item in results:
       process_and_upload(item)
