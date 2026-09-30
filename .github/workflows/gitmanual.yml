@@ -1,0 +1,79 @@
+name: GitManual
+
+on:
+  workflow_dispatch:
+    inputs:
+      rss_url:
+        description: "הכנס כתובת RSS של הפודקאסט"
+        required: true
+        type: string
+      episodes_per_run:
+        description: "כמה פרקים להוריד"
+        required: true
+        type: choice
+        default: "5"
+        options:
+          - "5"
+          - "10"
+          - "15"
+          - "20"
+          - "30"
+          - "40"
+          - "100"
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install feedparser requests
+
+      - name: Run script
+        env:
+          RSS_URL: ${{ inputs.rss_url }}
+          EPISODES_PER_RUN: ${{ inputs.episodes_per_run }}
+        run: python gitmanual.py
+
+      - name: Save state and files
+        run: |
+          git config user.name "bot"
+          git config user.email "bot@users.noreply.github.com"
+          
+          # מחיקת קבצים גדולים מ-45MB למניעת קריסת שרת
+          find podcasts/ -type f -size +45M -exec rm -f {} +
+          
+          # הוספת קובץ המצב החדש ותיקיית הפודקאסטים
+          git add gitmanual_seen.json podcasts/
+          
+          # ניסיון לבצע Commit ו-Push עם מנגנון ניסיון חוזר (עד 3 ניסיונות במקרה של שגיאת שרת)
+          git diff --cached --quiet || (
+            git commit -m "Update podcast episodes and state" && 
+            for i in {1..3}; do 
+              git push && break || sleep 5; 
+            done
+          )
+
+      - name: Zip podcasts folder dynamically
+        run: |
+          COUNT=$(find podcasts/ -name "*.mp3" | wc -l)
+          SAFE_SLUG="${PODCAST_SLUG:-podcast}"
+          ZIP_NAME="${SAFE_SLUG}_${COUNT}.zip"
+          echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
+          zip -r "$ZIP_NAME" podcasts/
+
+      - name: Upload to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ZIP_NAME: ${{ env.ZIP_NAME }}
+        run: |
+          gh release create podcast-episodes-release --title "Podcast Episodes Archive" --notes "Accumulated zip archives of podcast episodes." || true
+          gh release upload podcast-episodes-release "$ZIP_NAME" --clobber
