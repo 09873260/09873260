@@ -26,6 +26,17 @@ FEEDS = [
     "https://anchor.fm/s/1007c648c/podcast/rss",
     "https://anchor.fm/s/102ae1cf0/podcast/rss",
     "https://tonyrobbins.libsyn.com/rss",
+    "https://feeds.acast.com/public/shows/67587e77c705e441797aff96",
+    "https://feeds.megaphone.fm/ESP6921732651",
+    "https://feeds.megaphone.fm/the-rich-roll-podcast",
+    "https://anchor.fm/s/10d9805f4/podcast/rss",
+    "https://podcastfeeds.nbcnews.com/dateline-nbc",
+    "https://www.spreaker.com/show/5956723/episodes/feed",
+    "https://feeds.megaphone.fm/SIXMSB5088139739",
+    "https://feeds.npr.org/510298/podcast.xml",
+    "https://feeds.transistor.fm/think-fast-talk-smart-communication-techniques",
+    "https://feeds.megaphone.fm/NRD2548999404",
+    "https://api.substack.com/feed/podcast/1449053.rss",
 ]
 
 STATE_FILE = "seen.json"
