@@ -1,5 +1,6 @@
 import json
 import os
+import time
 import feedparser
 import requests
 
@@ -28,7 +29,7 @@ FEEDS = [
 ]
 
 STATE_FILE = "seen.json"
-DOWNLOAD_DIR = "podcasts"
+DOWNLOAD_DIR = "podcasts_auto"
 TEST_SEND = os.environ.get("TEST_SEND") == "true"
 
 
@@ -47,13 +48,24 @@ def save_state(state):
 def download_podcast(url, filename):
     os.makedirs(DOWNLOAD_DIR, exist_ok=True)
     path = os.path.join(DOWNLOAD_DIR, filename)
-    headers = {"User-Agent": "Mozilla/5.0"}
-    with requests.get(url, headers=headers, stream=True, timeout=180) as r:
-        r.raise_for_status()
-        with open(path, "wb") as f:
-            for chunk in r.iter_content(chunk_size=1024 * 256):
-                f.write(chunk)
-    return path
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+    
+    for attempt in range(1, 4):
+        try:
+            with requests.get(url, headers=headers, stream=True, timeout=300) as r:
+                r.raise_for_status()
+                with open(path, "wb") as f:
+                    for chunk in r.iter_content(chunk_size=1024 * 512):
+                        if chunk:
+                            f.write(chunk)
+            return path
+        except Exception as e:
+            print(f"ניסיון {attempt} נכשל בהורדת {filename}: {e}")
+            if attempt == 3:
+                raise e
+            time.sleep(5)
 
 
 def process_entry(feed_title, entry):
@@ -63,12 +75,10 @@ def process_entry(feed_title, entry):
         print(f"No audio file found for: {title}")
         return
 
-    # המרת סוגריים מרובעים לגרשיים והסרת נקודתיים
     cleaned_feed = feed_title.replace("[", "'").replace("]", "'").replace(":", "")
     cleaned_title = title.replace("[", "'").replace("]", "'").replace(":", "")
 
     full_name = f"{cleaned_feed} - {cleaned_title}"
-    # סינון תווים המותרים בשם הקובץ
     safe = "".join(c for c in full_name[:100] if c.isalnum() or c in " -_.,()'") or "episode"
     filename = f"{safe}.mp3"
     
