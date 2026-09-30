@@ -49,21 +49,49 @@ jobs:
             cat env_output.env >> $GITHUB_ENV
           fi
 
-      - name: Zip podcasts folder dynamically
+      - name: Zip and split podcasts folder dynamically
         run: |
           mkdir -p podcasts_manual
           COUNT=$(find podcasts_manual/ -name "*.mp3" 2>/dev/null | wc -l)
           SAFE_SLUG="${PODCAST_SLUG:-podcast}"
-          ZIP_NAME="${SAFE_SLUG}_${COUNT}.zip"
-          echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
-          zip -r "$ZIP_NAME" podcasts_manual/
+          
+          # יצירת קובץ ZIP מלא ראשוני
+          FULL_ZIP_NAME="${SAFE_SLUG}_${COUNT}.zip"
+          zip -r "$FULL_ZIP_NAME" podcasts_manual/
+          
+          # בדיקת גודל הקובץ בבתים (1.9GB = בערך 2040109465 בתים)
+          FILESIZE=$(stat -c%s "$FULL_ZIP_NAME")
+          MAX_SIZE=2040109465 # כ-1.9GB
+          
+          if [ "$FILESIZE" -gt "$MAX_SIZE" ]; then
+            echo "הקובץ חורג מ-1.9GB, מבצע פיצול לחלקים..."
+            # פיצול לקבצים בגודל 1.9GB כל אחד
+            split -b 1900M "$FULL_ZIP_NAME" "${SAFE_SLUG}_part_"
+            
+            # הסרת ה-ZIP המקורי הגדול כדי לא להעלות אותו כפול
+            rm "$FULL_ZIP_NAME"
+            
+            # שמירת רשימת החלקים להעלאה ב-Environment Variables
+            echo "IS_SPLIT=true" >> $GITHUB_ENV
+          else
+            echo "ZIP_NAME=$FULL_ZIP_NAME" >> $GITHUB_ENV
+            echo "IS_SPLIT=false" >> $GITHUB_ENV
+          fi
 
       - name: Upload to GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create manual-podcast-releases --title "Manual Podcast Episodes Archive" --notes "Accumulated zip archives of manual podcast episodes." || true
-          gh release upload manual-podcast-releases "${{ env.ZIP_NAME }}" --clobber
+          
+          if [ "$IS_SPLIT" = "true" ]; then
+            echo "מעלה חלקים מפוצלים..."
+            for part in ${PODCAST_SLUG:-podcast}_part_*; do
+              gh release upload manual-podcast-releases "$part" --clobber
+            done
+          else
+            gh release upload manual-podcast-releases "$ZIP_NAME" --clobber
+          fi
 
       - name: Remove large files locally before Git commit
         run: |
