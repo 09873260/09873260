@@ -51,7 +51,8 @@ jobs:
 
       - name: Zip podcasts folder dynamically
         run: |
-          COUNT=$(find podcasts_manual/ -name "*.mp3" | wc -l)
+          mkdir -p podcasts_manual
+          COUNT=$(find podcasts_manual/ -name "*.mp3" 2>/dev/null | wc -l)
           SAFE_SLUG="${PODCAST_SLUG:-podcast}"
           ZIP_NAME="${SAFE_SLUG}_${COUNT}.zip"
           echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
