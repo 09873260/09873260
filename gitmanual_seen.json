@@ -22,5 +22,22 @@
     "http://www.espn.com/espnradio/podcast?id=27048945",
     "http://www.espn.com/espnradio/podcast?id=27199263",
     "http://www.espn.com/espnradio/podcast?id=27100469"
+  ],
+  "https://feeds.npr.org/510298/podcast.xml": [
+    "97510a57-6b77-4cb2-9bb3-c23c42b1a2ea",
+    "a776db5b-21c3-4a61-8112-13546fb7ba0d",
+    "5d3e4415-f842-4e46-820c-8a397c22b38f",
+    "c5bf987c-6421-4419-a35c-0932a0c64c7b",
+    "933205d7-8214-4bdd-85e7-4fa1df2677f8",
+    "a76ccee8-599a-4e7e-80b9-ae8dd21cc4e1",
+    "b39b2045-5fb3-457e-a062-ef7182a1cc0f",
+    "60a97e19-f3d0-490b-b65c-f20554f12141",
+    "cf735abf-2548-42f8-bd7f-4e9088fb8424",
+    "32c185fb-7005-4b5f-92dd-4695a6c42f77",
+    "955e3a9d-5a33-4a15-a573-83aac924f8f0",
+    "6994a05b-85d3-41cf-b558-c0e44838506c",
+    "08da8a29-6854-412a-a54c-215e8485ca83",
+    "9e9841ce-bf6e-496d-84bc-78c13640a0d0",
+    "4e502cc0-f6e7-4a5b-89d3-e94f122009ab"
   ]
 }
