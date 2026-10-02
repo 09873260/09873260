@@ -1,3 +1,4 @@
+import calendar
 import json
 import os
 import time
@@ -42,6 +43,9 @@ FEEDS = [
 STATE_FILE = "seen.json"
 DOWNLOAD_DIR = "podcasts_auto"
 TEST_SEND = os.environ.get("TEST_SEND") == "true"
+
+MAX_IDS_FALLBACK = 200   # IDs kept per feed that has no dates
+FALLBACK_WINDOW = 20     # latest entries checked in a feed that has no dates
 
 
 def load_state():
@@ -100,6 +104,68 @@ def process_entry(feed_title, entry):
         print(f"Failed to download {filename}: {e}")
 
 
+# ---------- Tracking which episodes were already handled ----------
+def entry_ts(e):
+    p = e.get("published_parsed") or e.get("updated_parsed")
+    return calendar.timegm(p) if p else None
+
+
+def entry_id(e):
+    return e.get("id") or e.get("link")
+
+
+def handle_dated(state, feed_url, feed_title, entries, stamps):
+    """Default: store only the date of the last handled episode."""
+    latest = max(stamps)
+    old = state.get(feed_url)
+
+    # First run: just mark, download nothing
+    if old is None:
+        state[feed_url] = latest
+        return
+
+    # Migration from the old format (list of IDs): handle what's new once, then switch to a date
+    if isinstance(old, list):
+        seen = set(old)
+        for t, e in sorted(zip(stamps, entries), key=lambda x: x[0]):
+            if entry_id(e) not in seen:
+                process_entry(feed_title, e)
+        state[feed_url] = latest
+        return
+
+    if not isinstance(old, int):
+        state[feed_url] = latest
+        return
+
+    last = old
+    new = sorted(((t, e) for t, e in zip(stamps, entries) if t > old), key=lambda x: x[0])
+    for t, e in new:
+        process_entry(feed_title, e)
+        last = t
+    state[feed_url] = last
+
+
+def handle_undated(state, feed_url, feed_title, entries):
+    """Feed without dates: short ID list, only the latest entries are checked."""
+    window = entries[:FALLBACK_WINDOW]
+    ids = [entry_id(e) for e in window]
+    old = state.get(feed_url)
+
+    if not isinstance(old, list):     # first run (or it used to be a number)
+        state[feed_url] = ids
+        return
+
+    seen = set(old)
+    for e, i in reversed(list(zip(window, ids))):
+        if i in seen:
+            continue
+        process_entry(feed_title, e)
+        seen.add(i)
+
+    ids_set = set(ids)
+    state[feed_url] = (ids + [i for i in old if i not in ids_set])[:MAX_IDS_FALLBACK]
+
+
 def main():
     state = load_state()
     for feed_url in FEEDS:
@@ -112,23 +178,23 @@ def main():
 
         feed_title = parsed.feed.get("title", "Podcast")
         entries = parsed.entries
-        ids = [e.get("id") or e.get("link") for e in entries]
+
+        stamps = [entry_ts(e) for e in entries]
+        is_dated = all(stamps)
+        if not is_dated:
+            print(f"No dates in feed ({sum(1 for t in stamps if t)}/{len(entries)} dated), "
+                  f"using ID mode: {feed_title}")
 
         if TEST_SEND and entries:
             process_entry(feed_title, entries[0])
-            state.setdefault(feed_url, ids)
+            if feed_url not in state:
+                state[feed_url] = max(stamps) if is_dated else [entry_id(e) for e in entries[:FALLBACK_WINDOW]]
             continue
 
-        if feed_url not in state:
-            state[feed_url] = ids
-            continue
-
-        seen = set(state[feed_url])
-        for entry, eid in reversed(list(zip(entries, ids))):
-            if eid not in seen:
-                process_entry(feed_title, entry)
-                seen.add(eid)
-        state[feed_url] = list(seen)
+        if is_dated:
+            handle_dated(state, feed_url, feed_title, entries, stamps)
+        else:
+            handle_undated(state, feed_url, feed_title, entries)
 
     save_state(state)
 
